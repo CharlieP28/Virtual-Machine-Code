@@ -1,5 +1,6 @@
 class CPU():
-    def __init__(self, ram):
+    def __init__(self, ram, input_function):
+        self.__input_function = input_function
         self.__RAM = ram
         self.__PC = 0
         self.__MAR = 0
@@ -25,6 +26,7 @@ class CPU():
             '1001': 'JMZ',
             '1010': 'JMPP'
         }
+        self.outputVal = ''
 
     def update_flags(self):
         self.__z = 1 if self.__ACC == 0 else 0
@@ -43,19 +45,20 @@ class CPU():
         self.__MDR = self.__RAM.get_instruction(self.__MAR)
 
         if self.__MDR == [None, None]:
-            return False
+            return False, ''
 
         self.__CIR = {
             "opcode": self.__MDR[0],
             "operand": self.__MDR[1]
         }
 
-        return True
+        return True, ''
 
     def decode(self):
         self.__CIR['opcode'] = self.__instructionSet[self.__CIR['opcode']]
     
     def execute(self):
+        self.outputVal = ''
         advance_pc = True
         if self.__CIR['opcode'] == "LOAD":
             self.__MAR = self.__CIR["operand"]
@@ -73,14 +76,16 @@ class CPU():
             self.__RAM.set_data(self.__CIR['operand'], self.__ACC)
         
         elif self.__CIR['opcode'] == 'INP':
-            self.__ACC = int(input("> "))
+            inputVal = self.__input_function()
+            self.__ACC = inputVal
             self.update_flags()
-        
+            advance_pc = True
+
         elif self.__CIR['opcode'] == 'OUT':
-            print(self.__ACC)
+            self.outputVal = str(self.__ACC)
         
         elif self.__CIR["opcode"] == "HALT":
-            return False
+            return False, ''
 
         elif self.__CIR['opcode'] == 'JMP':
             self.__PC = self.__CIR["operand"]
@@ -101,7 +106,7 @@ class CPU():
         else:
             pass
         
-        return True
+        return True, self.outputVal
     
 
 
@@ -208,10 +213,15 @@ class Assembler():
 
 
 class VM:
-    def __init__(self):
+    def __init__(self, input_function):
+        self.input_function = input_function
         self.ram = RAM()
-        self.cpu = CPU(self.ram)
+        self.cpu = CPU(self.ram, self.input_function)
         self.assembler = Assembler()
+    
+    def reset(self):
+        self.ram = RAM()
+        self.cpu = CPU(self.ram, self.input_function)
     
     def load(self, source):
         self.assembler.tokenise(source)
@@ -226,24 +236,30 @@ class VM:
     
     def run(self):
 
+        output = []
+
         running = True
 
         while running:
 
-            if not self.cpu.fetch():
+            if self.cpu.fetch()[0] == False:
                 break
-
             self.cpu.decode()
-            
             result = self.cpu.execute()
+            
 
-            if result == False:
+            if result[0] == False:
                 running = False
+            
+            elif result[0] == True and result[1] != '':
+                output.append(result[1])
+        return output
+        
 
 
-vm = VM()
-vm.load(""" 
-        **INSERT ASSEMBLY CODE HERE**
-        """ )
+# vm = VM()
+# vm.load(""" 
+#         **INSERT ASSEMBLY CODE HERE**
+#         """ )
 
-vm.run()
+# vm.run()
